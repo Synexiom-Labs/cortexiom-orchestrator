@@ -57,7 +57,7 @@ def _load_regulation(file_name: str) -> str:
 
 
 def _search_knowledge_base(topic: str) -> str:
-    keywords = [w.lower() for w in topic.split() if len(w) > 3]
+    keywords = [w.lower() for w in topic.split() if len(w) >= 3]
     results = []
     for doc_path in sorted(KB_DIR.glob("*.md")):
         content = doc_path.read_text(encoding="utf-8")
@@ -111,8 +111,8 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
         checkpoint1_context = (
             f"CASE: {test_case['description']}\n\n"
             f"REQUEST: {test_case['request']}\n\n"
-            f"REGULATION RULES EXTRACTED:\n{parsed_rules[:2000]}\n\n"
-            f"EVIDENCE GATHERED (from knowledge_base/ only):\n{evidence[:2000]}\n\n"
+            f"REGULATION RULES EXTRACTED:\n{parsed_rules[:1200]}\n\n"
+            f"EVIDENCE GATHERED (from knowledge_base/ only):\n{evidence[:1200]}\n\n"
             f"The workflow is about to draft a compliance recommendation based on "
             f"the above evidence. Before proceeding:\n"
             f"1. Assess whether the evidence gathered is complete for this regulation\n"
@@ -154,8 +154,8 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
         # ── CORTEXIOM CHECKPOINT 2 — post_recommendation ───────────────────────
         checkpoint2_context = (
             f"CASE: {test_case['description']}\n\n"
-            f"REGULATION RULES:\n{parsed_rules[:1500]}\n\n"
-            f"DRAFT RECOMMENDATION:\n{recommendation[:2000]}\n\n"
+            f"REGULATION RULES:\n{parsed_rules[:800]}\n\n"
+            f"DRAFT RECOMMENDATION:\n{recommendation[:1500]}\n\n"
             f"Review this recommendation for:\n"
             f"1. Contradictions between the recommendation and the regulation rules\n"
             f"2. Jurisdiction-specific requirements that may have been missed\n"
@@ -188,7 +188,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
         # ── CORTEXIOM CHECKPOINT 3 — escalation ────────────────────────────────
         checkpoint3_context = (
             f"CASE: {test_case['description']}\n\n"
-            f"FINAL RECOMMENDATION (after revision):\n{final_recommendation[:2000]}\n\n"
+            f"FINAL RECOMMENDATION (after revision):\n{final_recommendation[:1500]}\n\n"
             f"Based on the full reasoning chain so far (pre-decision + post-recommendation), "
             f"determine the appropriate escalation routing:\n"
             f"1. FILE REPORT — documented and filed; no immediate escalation\n"

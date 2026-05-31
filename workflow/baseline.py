@@ -47,7 +47,7 @@ def _load_regulation(file_name: str) -> str:
 
 
 def _search_knowledge_base(topic: str) -> str:
-    keywords = [w.lower() for w in topic.split() if len(w) > 3]
+    keywords = [w.lower() for w in topic.split() if len(w) >= 3]
     results = []
     for doc_path in sorted(KB_DIR.glob("*.md")):
         content = doc_path.read_text(encoding="utf-8")
