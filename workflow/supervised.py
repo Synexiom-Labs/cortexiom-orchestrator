@@ -21,13 +21,32 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
-import google.generativeai as genai
+from google import genai
 
 from cortexiom import cortexiom_reason
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 KB_DIR = DATA_DIR / "knowledge_base"
 REG_DIR = DATA_DIR / "regulations"
+
+
+def _make_client() -> genai.Client:
+    api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
+    if api_key:
+        return genai.Client(api_key=api_key)
+    return genai.Client(
+        vertexai=True,
+        project=os.environ.get("GCP_PROJECT_ID", "cortexiom-orchestrator"),
+        location=os.environ.get("GCP_REGION", "us-central1"),
+    )
+
+
+def _generate(client: genai.Client, prompt: str) -> str:
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+    )
+    return response.text
 
 
 def _load_regulation(file_name: str) -> str:
@@ -62,15 +81,12 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
         dict with: parsed_rules, evidence, recommendation, final_recommendation,
                    cortexiom_checkpoints (list of dicts), error
     """
-    api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
-    if api_key:
-        genai.configure(api_key=api_key)
-
-    model = genai.GenerativeModel("gemini-2.5-flash")
     state_token: Optional[str] = None
     checkpoints = []
 
     try:
+        client = _make_client()
+
         # Stage 1 — DocumentParser (same as baseline)
         regulation_text = _load_regulation(test_case["regulation"])
         parse_prompt = (
@@ -79,7 +95,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
             f"Extract: applicable entities, mandatory requirements, thresholds, "
             f"effective dates, documentation standards, penalties."
         )
-        parsed_rules = model.generate_content(parse_prompt).text
+        parsed_rules = _generate(client, parse_prompt)
 
         # Stage 2 — EvidenceGatherer (same as baseline — knowledge_base/ only)
         evidence_text = _search_knowledge_base(test_case["topic"])
@@ -89,7 +105,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
             f"DOCUMENTS:\n{evidence_text}\n\n"
             f"Summarize: current state, compliance gaps, missing information noted in documents."
         )
-        evidence = model.generate_content(gather_prompt).text
+        evidence = _generate(client, gather_prompt)
 
         # ── CORTEXIOM CHECKPOINT 1 — pre_decision ──────────────────────────────
         checkpoint1_context = (
@@ -133,7 +149,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
             f"- ACTION ITEMS: Prioritized (P1/P2/P3) with owners and timelines\n"
             f"- CONFIDENCE: High/Medium/Low and why"
         )
-        recommendation = model.generate_content(draft_prompt).text
+        recommendation = _generate(client, draft_prompt)
 
         # ── CORTEXIOM CHECKPOINT 2 — post_recommendation ───────────────────────
         checkpoint2_context = (
@@ -158,7 +174,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
             "state_token_received": bool(state_token),
         })
 
-        # Revise recommendation if Cortexiom detected contradictions
+        # Revise recommendation based on Cortexiom cp2 findings
         revise_prompt = (
             f"You are a compliance recommendation drafter performing a revision.\n\n"
             f"ORIGINAL RECOMMENDATION:\n{recommendation}\n\n"
@@ -167,7 +183,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
             f"If contradictions or temporal gaps were found, update STATUS and CONFIDENCE "
             f"accordingly. Add a REVISION NOTES section explaining what changed and why."
         )
-        final_recommendation = model.generate_content(revise_prompt).text
+        final_recommendation = _generate(client, revise_prompt)
 
         # ── CORTEXIOM CHECKPOINT 3 — escalation ────────────────────────────────
         checkpoint3_context = (

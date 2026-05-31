@@ -12,11 +12,31 @@ import os
 from pathlib import Path
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 KB_DIR = DATA_DIR / "knowledge_base"
 REG_DIR = DATA_DIR / "regulations"
+
+
+def _make_client() -> genai.Client:
+    api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
+    if api_key:
+        return genai.Client(api_key=api_key)
+    # Fall back to Vertex AI ADC
+    return genai.Client(
+        vertexai=True,
+        project=os.environ.get("GCP_PROJECT_ID", "cortexiom-orchestrator"),
+        location=os.environ.get("GCP_REGION", "us-central1"),
+    )
+
+
+def _generate(client: genai.Client, prompt: str) -> str:
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+    )
+    return response.text
 
 
 def _load_regulation(file_name: str) -> str:
@@ -50,13 +70,9 @@ def run_baseline(test_case: dict[str, Any]) -> dict[str, Any]:
     Returns:
         dict with keys: parsed_rules, evidence, recommendation, cortexiom_checkpoints, error
     """
-    api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
-    if api_key:
-        genai.configure(api_key=api_key)
-
-    model = genai.GenerativeModel("gemini-2.5-flash")
-
     try:
+        client = _make_client()
+
         # Stage 1 — DocumentParser
         regulation_text = _load_regulation(test_case["regulation"])
         parse_prompt = (
@@ -72,7 +88,7 @@ def run_baseline(test_case: dict[str, Any]) -> dict[str, Any]:
             f"6. Penalties for non-compliance\n\n"
             f"Be precise. Do not soften mandatory language."
         )
-        parsed_rules = model.generate_content(parse_prompt).text
+        parsed_rules = _generate(client, parse_prompt)
 
         # Stage 2 — EvidenceGatherer (knowledge_base/ only — no adverse_flags/)
         evidence_text = _search_knowledge_base(test_case["topic"])
@@ -86,7 +102,7 @@ def run_baseline(test_case: dict[str, Any]) -> dict[str, Any]:
             f"3. Any missing information noted in the documents themselves\n\n"
             f"Report only what is in the documents. Do not speculate."
         )
-        evidence = model.generate_content(gather_prompt).text
+        evidence = _generate(client, gather_prompt)
 
         # Stage 3 — RecommendationDrafter
         draft_prompt = (
@@ -102,7 +118,7 @@ def run_baseline(test_case: dict[str, Any]) -> dict[str, Any]:
             f"- CONFIDENCE: High/Medium/Low and why\n\n"
             f"Be conservative. Flag ambiguity as 'Needs Review'."
         )
-        recommendation = model.generate_content(draft_prompt).text
+        recommendation = _generate(client, draft_prompt)
 
         return {
             "parsed_rules": parsed_rules,
