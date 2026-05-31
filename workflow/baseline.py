@@ -14,9 +14,16 @@ from typing import Any
 
 from google import genai
 
-DATA_DIR = Path(__file__).parent.parent / "data"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 KB_DIR = DATA_DIR / "knowledge_base"
 REG_DIR = DATA_DIR / "regulations"
+
+# Surface path problems immediately rather than silently returning no results
+if not KB_DIR.exists():
+    raise RuntimeError(
+        f"Knowledge base directory not found: {KB_DIR}\n"
+        f"Run streamlit from the cortexiom-orchestrator project root."
+    )
 
 
 def _make_client() -> genai.Client:
