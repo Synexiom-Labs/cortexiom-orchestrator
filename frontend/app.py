@@ -148,7 +148,7 @@ if run_btn:
             "DocumentParser → EvidenceGatherer → **Cortexiom CP1** → "
             "RecommendationDrafter → **Cortexiom CP2** → Revision → **Cortexiom CP3**"
         )
-        with st.spinner("Running supervised workflow (3 Cortexiom checkpoints)…"):
+        with st.spinner("Running supervised workflow — 3 Cortexiom checkpoints (5-layer reasoning pipeline each, ~2–3 min total)…"):
             t0 = time.time()
             supervised_result = run_supervised(test_case)
             sup_elapsed = time.time() - t0

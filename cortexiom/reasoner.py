@@ -39,7 +39,14 @@ def cortexiom_reason(
         "chain, (2) any contradictions or gaps detected, (3) recommended action."
     )
 
-    payload: dict = {"message": message, "persona": "compliance_supervisor"}
+    payload: dict = {
+        "message": message,
+        "persona": {
+            "name": "Compliance Supervisor",
+            "role": "Senior Compliance Analyst",
+            "domain": "Regulatory Compliance and Risk Management",
+        },
+    }
     if state_token:
         payload["state_token"] = state_token
 
@@ -50,7 +57,7 @@ def cortexiom_reason(
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
-        timeout=45,
+        timeout=180,
     )
     resp.raise_for_status()
     data = resp.json()
