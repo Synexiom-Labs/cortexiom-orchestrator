@@ -1,0 +1,37 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: cortexiom-orchestrator
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "3"
+        run.googleapis.com/cpu-throttling: "false"
+    spec:
+      containerConcurrency: 10
+      timeoutSeconds: 300
+      containers:
+        - image: gcr.io/cortexiom-orchestrator/cortexiom-orchestrator:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          env:
+            - name: GCP_PROJECT_ID
+              value: cortexiom-orchestrator
+            - name: GCP_REGION
+              value: us-central1
+            - name: GCS_BUCKET_NAME
+              value: cortexiom-orchestrator-data
+            - name: CORTEXIOM_API_URL
+              value: https://api.cortexiom.com/v1/encounter
+            # Secrets — set via Secret Manager in production
+            # gcloud run services update cortexiom-orchestrator \
+            #   --update-secrets=CORTEXIOM_API_KEY=cortexiom-api-key:latest \
+            #   --update-secrets=GOOGLE_API_KEY=google-api-key:latest
