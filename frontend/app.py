@@ -23,6 +23,11 @@ load_dotenv()
 from test_cases import TEST_CASES
 from workflow import run_baseline, run_supervised
 
+
+def md(text: str) -> None:
+    """Render workflow output as markdown, escaping $ to prevent LaTeX rendering."""
+    st.markdown(text.replace("$", r"\$") if text else "—")
+
 # ─── Page config ─────────────────────────────────────────────────────────────
 
 st.set_page_config(
@@ -170,21 +175,21 @@ if run_btn:
     with col_base:
         st.markdown(f"**Elapsed:** {base_elapsed:.1f}s")
         with st.expander("📋 Parsed Regulation Rules", expanded=False):
-            st.markdown(baseline_result.get("parsed_rules", "—"))
+            md(baseline_result.get("parsed_rules", "—"))
 
         with st.expander("🔍 Evidence Gathered", expanded=False):
-            st.markdown(baseline_result.get("evidence", "—"))
+            md(baseline_result.get("evidence", "—"))
 
         st.markdown("### Final Recommendation")
-        st.markdown(baseline_result.get("recommendation", "—"))
+        md(baseline_result.get("recommendation", "—"))
 
     with col_sup:
         st.markdown(f"**Elapsed:** {sup_elapsed:.1f}s")
         with st.expander("📋 Parsed Regulation Rules", expanded=False):
-            st.markdown(supervised_result.get("parsed_rules", "—"))
+            md(supervised_result.get("parsed_rules", "—"))
 
         with st.expander("🔍 Evidence Gathered", expanded=False):
-            st.markdown(supervised_result.get("evidence", "—"))
+            md(supervised_result.get("evidence", "—"))
 
         # ── Cortexiom checkpoints ─────────────────────────────────────────────
         checkpoints = supervised_result.get("cortexiom_checkpoints", [])
@@ -215,11 +220,11 @@ if run_btn:
                         f"</div>",
                         unsafe_allow_html=True,
                     )
-                    st.markdown(cp.get("response", "—"))
+                    md(cp.get("response", "—"))
 
         st.markdown("### Final Recommendation (Cortexiom-Revised)")
         final = supervised_result.get("final_recommendation") or supervised_result.get("recommendation", "—")
-        st.markdown(final)
+        md(final)
 
     # ── What Cortexiom caught ─────────────────────────────────────────────────
 
