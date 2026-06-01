@@ -136,10 +136,13 @@ def run_baseline(test_case: dict[str, Any]) -> dict[str, Any]:
         }
 
     except Exception as exc:
+        err = str(exc)
+        if any(s in err for s in ("Bearer", "cx_live", "api_key", "Authorization")):
+            err = "API authentication error — check that API keys are set correctly in the environment."
         return {
             "parsed_rules": "",
             "evidence": "",
             "recommendation": "",
             "cortexiom_checkpoints": [],
-            "error": str(exc),
+            "error": err,
         }

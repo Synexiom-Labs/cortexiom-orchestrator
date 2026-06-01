@@ -17,7 +17,7 @@ def cortexiom_reason(
     context:        structured summary of the workflow state at this point
     state_token:    opaque token from a prior call; enables multi-step session continuity
     """
-    api_key = os.environ.get("CORTEXIOM_API_KEY", "")
+    api_key = os.environ.get("CORTEXIOM_API_KEY", "").strip()
     api_url = os.environ.get(
         "CORTEXIOM_API_URL", "https://api.cortexiom.com/v1/encounter"
     )
