@@ -188,17 +188,31 @@ if run_btn:
             supervised_result = run_supervised(test_case)
             sup_elapsed = time.time() - t0
 
-    # ── Error handling ────────────────────────────────────────────────────────
+    # Store results in session state so they survive page reruns
+    st.session_state.run_results = {
+        "baseline": baseline_result,
+        "supervised": supervised_result,
+        "base_elapsed": base_elapsed,
+        "sup_elapsed": sup_elapsed,
+        "test_case": test_case,
+    }
+    st.rerun()
+
+# ─── Display results (from session state — survives sidebar interaction) ──────
+
+if "run_results" in st.session_state and st.session_state.run_results.get("test_case", {}).get("id") == test_case.get("id"):
+    r = st.session_state.run_results
+    baseline_result = r["baseline"]
+    supervised_result = r["supervised"]
+    base_elapsed = r["base_elapsed"]
+    sup_elapsed = r["sup_elapsed"]
 
     if baseline_result.get("error"):
-        col_base.error(f"Baseline error: {baseline_result['error']}")
+        st.error(f"Baseline error: {baseline_result['error']}")
     if supervised_result.get("error"):
-        col_sup.error(f"Supervised error: {supervised_result['error']}")
+        st.error(f"Supervised error: {supervised_result['error']}")
 
     st.markdown("---")
-
-    # ── Stage comparison ──────────────────────────────────────────────────────
-
     st.markdown("## Results")
     col_base, col_sup = st.columns(2)
 
@@ -206,10 +220,8 @@ if run_btn:
         st.markdown(f"**Elapsed:** {base_elapsed:.1f}s")
         with st.expander("📋 Parsed Regulation Rules", expanded=False):
             md(baseline_result.get("parsed_rules", "—"))
-
         with st.expander("🔍 Evidence Gathered", expanded=False):
             md(baseline_result.get("evidence", "—"))
-
         st.markdown("### Final Recommendation")
         md(baseline_result.get("recommendation", "—"))
 
@@ -217,27 +229,16 @@ if run_btn:
         st.markdown(f"**Elapsed:** {sup_elapsed:.1f}s")
         with st.expander("📋 Parsed Regulation Rules", expanded=False):
             md(supervised_result.get("parsed_rules", "—"))
-
         with st.expander("🔍 Evidence Gathered", expanded=False):
             md(supervised_result.get("evidence", "—"))
 
-        # ── Cortexiom checkpoints ─────────────────────────────────────────────
         checkpoints = supervised_result.get("cortexiom_checkpoints", [])
         if checkpoints:
             st.markdown("### 🧠 Cortexiom Reasoning Checkpoints")
             for cp in checkpoints:
                 confidence = cp.get("confidence", 0.5)
                 conf_pct = int(confidence * 100)
-                if confidence >= 0.75:
-                    conf_class = "confidence-high"
-                    conf_icon = "🟢"
-                elif confidence >= 0.5:
-                    conf_class = "confidence-medium"
-                    conf_icon = "🟡"
-                else:
-                    conf_class = "confidence-low"
-                    conf_icon = "🔴"
-
+                conf_icon = "🟢" if confidence >= 0.75 else ("🟡" if confidence >= 0.5 else "🔴")
                 with st.expander(
                     f"**{cp['name']}** — Confidence {conf_icon} {conf_pct}%",
                     expanded=True,
@@ -256,11 +257,8 @@ if run_btn:
         final = supervised_result.get("final_recommendation") or supervised_result.get("recommendation", "—")
         md(final)
 
-    # ── What Cortexiom caught ─────────────────────────────────────────────────
-
     st.markdown("---")
     st.markdown("## What Cortexiom caught")
-
     col_expected, col_actual = st.columns(2)
     with col_expected:
         st.markdown("**Expected baseline flaw:**")
