@@ -7,6 +7,7 @@ Demonstrates how Cortexiom catches what baseline misses at three reasoning check
 Run:
     streamlit run frontend/app.py
 """
+import os
 import sys
 import time
 from pathlib import Path
@@ -36,6 +37,35 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ─── Access gate ─────────────────────────────────────────────────────────────
+
+def _check_access() -> bool:
+    access_code = os.environ.get("DEMO_ACCESS_CODE", "")
+    if not access_code:
+        return True  # no code configured — local dev, allow through
+    return st.session_state.get("authenticated") is True
+
+if not _check_access():
+    st.markdown(
+        """
+        <style>
+        .block-container { max-width: 420px; margin: 8rem auto; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("### 🧠 Cortexiom Orchestrator")
+    st.caption("Google for Startups AI Agents Challenge — 2026 | Synexiom Labs")
+    st.divider()
+    code = st.text_input("Access code", type="password", placeholder="Enter your access code")
+    if st.button("Enter", use_container_width=True, type="primary"):
+        if code == os.environ.get("DEMO_ACCESS_CODE", ""):
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("Invalid access code.")
+    st.stop()
 
 # ─── Styles ──────────────────────────────────────────────────────────────────
 
