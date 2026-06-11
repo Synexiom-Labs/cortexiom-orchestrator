@@ -172,7 +172,7 @@ if run_btn:
     with col_base:
         st.markdown("### 🔵 Baseline Workflow")
         st.caption("DocumentParser → EvidenceGatherer → RecommendationDrafter")
-        with st.spinner("Running baseline workflow…"):
+        with st.spinner("Running baseline workflow (~30–60s)…"):
             t0 = time.time()
             baseline_result = run_baseline(test_case)
             base_elapsed = time.time() - t0
@@ -183,12 +183,16 @@ if run_btn:
             "DocumentParser → EvidenceGatherer → **Cortexiom CP1** → "
             "RecommendationDrafter → **Cortexiom CP2** → Revision → **Cortexiom CP3**"
         )
-        with st.spinner("Running supervised workflow — 3 Cortexiom checkpoints (5-layer reasoning pipeline each, ~2–3 min total)…"):
+        stage_display = st.empty()
+        def _on_stage(msg: str):
+            stage_display.markdown(f"<div style='font-size:0.82rem;color:#94a3b8;padding:4px 0'>{msg}</div>", unsafe_allow_html=True)
+        with st.spinner("Supervised workflow running — 3 Cortexiom checkpoints, each runs a 5-layer reasoning pipeline. Total: 6–8 minutes…"):
             t0 = time.time()
-            supervised_result = run_supervised(test_case)
+            supervised_result = run_supervised(test_case, on_stage=_on_stage)
             sup_elapsed = time.time() - t0
+        stage_display.empty()
 
-    # Store results in session state so they survive page reruns
+    # Store in session state — display inline (no st.rerun() to avoid losing state on Cloud Run)
     st.session_state.run_results = {
         "baseline": baseline_result,
         "supervised": supervised_result,
@@ -196,9 +200,8 @@ if run_btn:
         "sup_elapsed": sup_elapsed,
         "test_case": test_case,
     }
-    st.rerun()
 
-# ─── Display results (from session state — survives sidebar interaction) ──────
+# ─── Display results ──────────────────────────────────────────────────────────
 
 if "run_results" in st.session_state and st.session_state.run_results.get("test_case", {}).get("id") == test_case.get("id"):
     r = st.session_state.run_results

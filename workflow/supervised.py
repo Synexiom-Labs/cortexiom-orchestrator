@@ -73,7 +73,7 @@ def _search_knowledge_base(topic: str) -> str:
     return "\n\n".join(results) if results else "No relevant documents found."
 
 
-def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
+def run_supervised(test_case: dict[str, Any], on_stage=None) -> dict[str, Any]:
     """
     Run the compliance workflow with Cortexiom supervision at 3 checkpoints.
 
@@ -88,6 +88,10 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
         dict with: parsed_rules, evidence, recommendation, final_recommendation,
                    cortexiom_checkpoints (list of dicts), error
     """
+    def _stage(msg: str) -> None:
+        if on_stage:
+            on_stage(msg)
+
     state_token: Optional[str] = None
     checkpoints = []
 
@@ -95,6 +99,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
         client = _make_client()
 
         # Stage 1 — DocumentParser (same as baseline)
+        _stage("📄 Parsing regulation...")
         regulation_text = _load_regulation(test_case["regulation"])
         parse_prompt = (
             f"You are a compliance document parser. Extract all compliance rules.\n\n"
@@ -105,6 +110,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
         parsed_rules = _generate(client, parse_prompt)
 
         # Stage 2 — EvidenceGatherer (same as baseline — knowledge_base/ only)
+        _stage("🔍 Gathering evidence from knowledge base...")
         evidence_text = _search_knowledge_base(test_case["topic"])
         gather_prompt = (
             f"You are a compliance evidence gatherer.\n\n"
@@ -115,6 +121,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
         evidence = _generate(client, gather_prompt)
 
         # ── CORTEXIOM CHECKPOINT 1 — pre_decision ──────────────────────────────
+        _stage("🧠 Cortexiom CP1 — evidence completeness review (60–90s)...")
         checkpoint1_context = (
             f"CASE: {test_case['description']}\n\n"
             f"REQUEST: {test_case['request']}\n\n"
@@ -139,7 +146,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
             "state_token_received": bool(state_token),
         })
 
-        # Stage 3 — RecommendationDrafter (enhanced with Cortexiom cp1 findings)
+        _stage(f"✅ CP1 complete — confidence {int(cp1.confidence * 100)}%  |  ✍️ Drafting recommendation...")
         draft_prompt = (
             f"You are a compliance recommendation drafter.\n\n"
             f"REQUEST: {test_case['request']}\n\n"
@@ -159,6 +166,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
         recommendation = _generate(client, draft_prompt)
 
         # ── CORTEXIOM CHECKPOINT 2 — post_recommendation ───────────────────────
+        _stage("🧠 Cortexiom CP2 — contradiction detection (60–90s)...")
         checkpoint2_context = (
             f"CASE: {test_case['description']}\n\n"
             f"REGULATION RULES:\n{parsed_rules[:800]}\n\n"
@@ -181,6 +189,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
             "state_token_received": bool(state_token),
         })
 
+        _stage(f"✅ CP2 complete — confidence {int(cp2.confidence * 100)}%  |  🔄 Revising recommendation...")
         # Revise recommendation based on Cortexiom cp2 findings
         revise_prompt = (
             f"You are a compliance recommendation drafter performing a revision.\n\n"
@@ -193,6 +202,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
         final_recommendation = _generate(client, revise_prompt)
 
         # ── CORTEXIOM CHECKPOINT 3 — escalation ────────────────────────────────
+        _stage("🧠 Cortexiom CP3 — escalation routing (60–90s)...")
         checkpoint3_context = (
             f"CASE: {test_case['description']}\n\n"
             f"FINAL RECOMMENDATION (after revision):\n{final_recommendation[:1500]}\n\n"
@@ -205,6 +215,7 @@ def run_supervised(test_case: dict[str, Any]) -> dict[str, Any]:
         )
         cp3 = cortexiom_reason("escalation", checkpoint3_context, state_token)
         state_token = cp3.state_token or state_token
+        _stage(f"✅ CP3 complete — confidence {int(cp3.confidence * 100)}%  |  ✅ All done.")
         checkpoints.append({
             "name": "Checkpoint 3 — Escalation",
             "description": "Final routing: file / human review / urgent escalation",
